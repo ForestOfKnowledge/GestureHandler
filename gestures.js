@@ -1,0 +1,190 @@
+class GestureHandler {
+  constructor(element) {
+    this.element = element;
+    this.startX = 0;
+    this.startY = 0;
+    this.endX = 0;
+    this.endY = 0;
+    this.threshold = 50; // Minimum distance for swipe gesture
+    this.callbacks = {
+      swipeUp: null,
+      swipeDown: null,
+      swipeLeft: null,
+      swipeRight: null,
+    };
+    this.eventListeners = {}; // Object to store the added event listeners
+    this.checkExistingGestureListener();
+    this.addEventListeners();
+  }
+
+  checkExistingGestureListener() {
+    const existingGestureListener = this.element._gestureListener;
+
+    //TODO Development Settings Only Error
+    if (existingGestureListener) {
+      console.error(
+        "A gesture event listener is already attached to the element. You can only have one gesture event listener per element."
+      );
+      return;
+    }
+
+    this.element._gestureListener = this;
+  }
+
+  addEventListeners() {
+    const touchstartListener = (event) => {
+      this.startX = event.touches[0].clientX;
+      this.startY = event.touches[0].clientY;
+    };
+
+    const touchmoveListener = (event) => {
+      this.updateSwipeData(event);
+    };
+
+    const touchendListener = (event) => {
+      this.endX = event.changedTouches[0].clientX;
+      this.endY = event.changedTouches[0].clientY;
+      this.handleGesture();
+    };
+
+    this.element.addEventListener("touchstart", touchstartListener, false);
+    this.element.addEventListener("touchmove", touchmoveListener, false);
+    this.element.addEventListener("touchend", touchendListener, false);
+
+    // Store the event listeners to be able to remove them later
+    this.eventListeners.touchstartListener = touchstartListener;
+    this.eventListeners.touchmoveListener = touchmoveListener;
+    this.eventListeners.touchendListener = touchendListener;
+  }
+
+  removeEventListeners() {
+    this.element.removeEventListener(
+      "touchstart",
+      this.eventListeners.touchstartListener
+    );
+    this.element.removeEventListener(
+      "touchmove",
+      this.eventListeners.touchmoveListener
+    );
+    this.element.removeEventListener(
+      "touchend",
+      this.eventListeners.touchendListener
+    );
+    delete this.element._gestureListener;
+  }
+
+  swipeUp(callback) {
+    this.callbacks.swipeUp = callback;
+    return this;
+  }
+
+  swipeDown(callback) {
+    this.callbacks.swipeDown = callback;
+    return this;
+  }
+
+  swipeLeft(callback) {
+    this.callbacks.swipeLeft = callback;
+    return this;
+  }
+
+  swipeRight(callback) {
+    this.callbacks.swipeRight = callback;
+    return this;
+  }
+
+  updateSwipeData(event) {
+    const elementWidth = this.element.offsetWidth;
+    const elementHeight = this.element.offsetHeight;
+    const pageWidth = window.innerWidth;
+    const pageHeight = window.innerHeight;
+
+    const currentX = event.touches[0].clientX;
+    const currentY = event.touches[0].clientY;
+
+    const deltaX = currentX - this.startX;
+    const deltaY = currentY - this.startY;
+
+    const percentX = (Math.abs(deltaX) / elementWidth) * 100;
+    const percentY = (Math.abs(deltaY) / elementHeight) * 100;
+
+    const swipeData = {
+      percentX,
+      percentY,
+      regionX: (currentX / elementWidth) * 100,
+      regionY: (currentY / elementHeight) * 100,
+    };
+
+    if (Math.abs(deltaX) > Math.abs(deltaY)) {
+      if (deltaX > this.threshold && this.callbacks.swipeRight) {
+        this.callbacks.swipeRight(swipeData);
+      } else if (deltaX < -this.threshold && this.callbacks.swipeLeft) {
+        this.callbacks.swipeLeft(swipeData);
+      }
+    } else {
+      if (deltaY > this.threshold && this.callbacks.swipeDown) {
+        this.callbacks.swipeDown(swipeData);
+      } else if (deltaY < -this.threshold && this.callbacks.swipeUp) {
+        this.callbacks.swipeUp(swipeData);
+      }
+    }
+  }
+
+  handleGesture() {
+    const elementWidth = this.element.offsetWidth;
+    const elementHeight = this.element.offsetHeight;
+    const deltaX = this.endX - this.startX;
+    const deltaY = this.endY - this.startY;
+
+    const swipeData = {
+      percentX: (Math.abs(deltaX) / elementWidth) * 100,
+      percentY: (Math.abs(deltaY) / elementHeight) * 100,
+      regionX: (this.endX / elementWidth) * 100,
+      regionY: (this.endY / elementHeight) * 100,
+    };
+
+    if (Math.abs(deltaX) > Math.abs(deltaY)) {
+      if (deltaX > this.threshold && this.callbacks.swipeRight) {
+        this.callbacks.swipeRight(swipeData);
+      } else if (deltaX < -this.threshold && this.callbacks.swipeLeft) {
+        this.callbacks.swipeLeft(swipeData);
+      }
+    } else {
+      if (deltaY > this.threshold && this.callbacks.swipeDown) {
+        this.callbacks.swipeDown(swipeData);
+      } else if (deltaY < -this.threshold && this.callbacks.swipeUp) {
+        this.callbacks.swipeUp(swipeData);
+      }
+    }
+  }
+
+  destroy(gestureType) {
+    if (gestureType) {
+      // Remove a specific gesture listener
+      if (gestureType in this.callbacks) {
+        this.callbacks[gestureType] = null;
+      }
+    } else {
+      // Remove all gesture listeners if no callbacks are set
+      const hasCallbacks = Object.values(this.callbacks).some(
+        (callback) => callback !== null
+      );
+      if (!hasCallbacks) {
+        this.callbacks = {
+          swipeUp: null,
+          swipeDown: null,
+          swipeLeft: null,
+          swipeRight: null,
+        };
+      }
+    }
+
+    // Remove event listeners from the element if no callbacks are set
+    const hasCallbacks = Object.values(this.callbacks).some(
+      (callback) => callback !== null
+    );
+    if (!hasCallbacks) {
+      this.removeEventListeners();
+    }
+  }
+}
